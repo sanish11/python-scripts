@@ -15,6 +15,7 @@ logging.basicConfig(
     ]
 )
 
+
 REMOVE_KEYWORDS = [
     "SF_Rendition_Provider_Callout",
     "Total_Number_Of_Incomplete_Action_Plans",
@@ -34,8 +35,19 @@ def process_stf_file(input_file, output_file, language_code, char_limit=38):
     :param language_code: Language code for appending translations (e.g., 'es', 'fr').
     :param char_limit: Maximum allowed character length for any field (default: 255).
     """
+
+
+
     try:
         logging.info(f"Starting processing: {input_file}")
+        RETAIN_METADATA = [
+            "Language code: fr",
+            "Type: Bilingual",
+            "Translation type: Metadata",
+            "------------------TRANSLATED-------------------",
+            "# KEY	LABEL	TRANSLATION	OUT OF DATE",
+            
+        ]
         
         with open(input_file, 'r', encoding='utf-8') as file:
             lines = file.readlines()
@@ -43,6 +55,7 @@ def process_stf_file(input_file, output_file, language_code, char_limit=38):
         processed_lines = []
         key_map = defaultdict(list)  # To track duplicate keys
         bilingual_started = False
+        retain_metadata = True
 
         for line in lines:
             stripped_line = line.strip()
@@ -55,12 +68,29 @@ def process_stf_file(input_file, output_file, language_code, char_limit=38):
             if stripped_line.startswith("Flow."):
                 logging.debug(f"Skipped flow element: {stripped_line}")
                 continue
+            
+            # if any(retain_item in stripped_line for retain_item in RETAIN_METADATA):
+            #     processed_lines.append(stripped_line)
+            #     logging.debug(f"Retaining metadata line: {stripped_line}")
+            #     continue
 
             # Preserve comment lines or metadata lines
-            if stripped_line.startswith("#") or stripped_line.lower().startswith("language code:") or stripped_line.lower().startswith("type:") or stripped_line.lower().startswith("translation type:"):
-                processed_lines.append(stripped_line)
-                logging.debug(f"Retaining metadata or comment line: {stripped_line}")
-                continue
+           # if stripped_line.startswith("#KEY") or stripped_line.lower().startswith("CustomField") :
+            #    processed_lines.append(stripped_line)
+             #   logging.debug(f"Retaining metadata or comment line: {stripped_line}")
+              #  continue
+
+            if retain_metadata:
+                if any(retain_item in stripped_line for retain_item in RETAIN_METADATA) or \
+                   stripped_line.startswith("#KEY") or \
+                   stripped_line.lower().startswith("customfield"):
+                    processed_lines.append(stripped_line)  # Retain the line
+                    logging.debug(f"Retaining metadata line: {stripped_line}")
+                    
+                    # Stop retaining metadata after the first CustomField line
+                    if stripped_line.lower().startswith("customfield"):
+                        retain_metadata = False  # Stop retaining metadata after CustomField
+                    continue 
             
 
             # Match and process lines with the regex replacement logic
@@ -76,7 +106,7 @@ def process_stf_file(input_file, output_file, language_code, char_limit=38):
                     elif "RelatedListLabel" in key:
                     # Truncate the third part to 80 characters
                         parts[2] = parts[2][:80]
-    
+
             # Reconstruct the line after truncation
                 replacement = "\t".join(parts)
 
@@ -84,10 +114,7 @@ def process_stf_file(input_file, output_file, language_code, char_limit=38):
                 logging.debug(f"Processed line with replacement: {replacement}")
             continue
 
-            # Ignore comments or unsupported elements
-            if line.strip().startswith("#") or not line.strip():
-                logging.debug(f"Ignoring line: {line.strip()}")
-                continue
+           
 
         # Save the processed lines
         with open(output_file, 'w', encoding='utf-8') as file:
